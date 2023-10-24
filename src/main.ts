@@ -7,7 +7,7 @@ async function bootstrap() {
 
   const config = new DocumentBuilder()
     .setTitle('Swagger')
-    .addBearerAuth()
+    .addBearerAuth({ type: 'http', scheme: 'bearer', bearerFormat: 'JWT' })
     .setDescription('The API description')
     .setVersion('1.0')
     .build();
