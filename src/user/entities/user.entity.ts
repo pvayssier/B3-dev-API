@@ -1,7 +1,8 @@
-import { Column, Entity, PrimaryGeneratedColumn } from 'typeorm';
+import { Column, Entity, PrimaryGeneratedColumn, OneToMany } from 'typeorm';
+import { ProjectUser } from '../../project-users/entities/project-user.entity';
 
 @Entity()
-export class Users {
+export class User {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
@@ -20,4 +21,7 @@ export class Users {
     default: 'Employee',
   })
   role: string;
+
+  @OneToMany(() => ProjectUser, (projectUser) => projectUser.userId)
+  projectUsers: ProjectUser[];
 }

@@ -10,8 +10,8 @@ import * as dayjs from 'dayjs';
 
 // Entities
 import { ProjectUser } from './entities/project-user.entity';
-import { Users } from '../user/entities/user.entity';
-import { Projects } from '../projects/entities/projects.entity';
+import { User } from '../user/entities/user.entity';
+import { Project } from '../projects/entities/projects.entity';
 
 // DTOs
 import { CreateProjectUserDto } from './dto/create-project-user.dto';
@@ -19,9 +19,9 @@ import { CreateProjectUserDto } from './dto/create-project-user.dto';
 @Injectable()
 export class ProjectUsersService {
   constructor(
-    @InjectRepository(Users) private readonly userRepository: Repository<Users>,
-    @InjectRepository(Projects)
-    private readonly projectRepository: Repository<Projects>,
+    @InjectRepository(User) private readonly userRepository: Repository<User>,
+    @InjectRepository(Project)
+    private readonly projectRepository: Repository<Project>,
     @InjectRepository(ProjectUser)
     private readonly projectUserRepository: Repository<ProjectUser>,
   ) {}
@@ -69,61 +69,34 @@ export class ProjectUsersService {
     const referringEmployee = await this.userRepository.findOne({
       where: { id: project.referringEmployeeId },
     });
-    const projectUser =
+    const response =
       await this.projectUserRepository.save(createProjectUserDto);
-    const response = {
-      id: projectUser.id,
-      startDate: projectUser.startDate,
-      endDate: projectUser.endDate,
-      userId: projectUser.userId,
-      user: {
-        id: user.id,
-        username: user.username,
-        email: user.email,
-        role: user.role,
-      },
-      projectId: createProjectUserDto.projectId,
-      project: {
-        id: project.id,
-        name: project.name,
-        referringEmployeeId: project.referringEmployeeId,
-        referringEmployee: {
-          id: referringEmployee.id,
-          username: referringEmployee.username,
-          email: referringEmployee.email,
-          role: referringEmployee.role,
-        },
-      },
-    };
+    response.project = project;
+    response.user = user;
+    response.project.referringEmployee = referringEmployee;
+    delete response.user.password;
+    delete response.project.referringEmployee.password;
     return response;
   }
 
   async findAll(userId: string) {
-    const projectsUser = this.projectUserRepository.find({
+    const projectsUser = await this.projectUserRepository.find({
       where: { userId: userId },
+      relations: ['project', 'user'],
     });
-    if (!projectsUser) {
-      return '';
-    }
     const requester = await this.userRepository.findOne({
       where: { id: userId },
     });
     if (requester.role === 'Employee') {
-      const response = [];
-      for (const projectUser of await projectsUser) {
-        const project = await this.projectRepository.findOne({
-          where: { id: projectUser.projectId },
-        });
-        const projectUserResponse = {
-          id: projectUser.id,
-          name: project.name,
-          referringEmployeeId: project.referringEmployeeId,
-        };
-        response.push(projectUserResponse);
-      }
-      return response;
+      projectsUser.map((projectUser) => {
+        delete projectUser.project;
+        delete projectUser.user;
+      });
     }
-    return await projectsUser;
+    if (!projectsUser) {
+      return '';
+    }
+    return projectsUser;
   }
 
   async findOne(id: string) {

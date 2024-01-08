@@ -6,17 +6,17 @@ import {
 } from '@nestjs/common';
 import { Repository } from 'typeorm';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Users } from '../user/entities/user.entity';
-import { Projects } from './entities/projects.entity';
+import { User } from '../user/entities/user.entity';
+import { Project } from './entities/projects.entity';
 import { CreateProjectDto } from './dto/create-project.dto';
 import { ProjectUser } from '../project-users/entities/project-user.entity';
 
 @Injectable()
 export class ProjectsService {
   constructor(
-    @InjectRepository(Users) private readonly userRepository: Repository<Users>,
-    @InjectRepository(Projects)
-    private readonly projectRepository: Repository<Projects>,
+    @InjectRepository(User) private readonly userRepository: Repository<User>,
+    @InjectRepository(Project)
+    private readonly projectRepository: Repository<Project>,
     @InjectRepository(ProjectUser)
     private readonly projectUserRepository: Repository<ProjectUser>,
   ) {}
@@ -36,12 +36,14 @@ export class ProjectsService {
       throw new UnauthorizedException();
     }
     const response = await this.projectRepository.save(createProjectDto);
-    delete manager.password;
+    response.referringEmployee = manager;
+    delete response.referringEmployee.password;
+    delete response.referringEmployee.projectUsers;
     return {
       id: response.id,
       name: response.name,
       referringEmployeeId: response.referringEmployeeId,
-      referringEmployee: manager,
+      referringEmployee: response.referringEmployee,
     };
   }
 
@@ -50,21 +52,39 @@ export class ProjectsService {
       where: { id: userId },
     });
     if (requester.role !== 'Employee') {
-      const response = await this.projectUserRepository.find();
-      return await this.formatDataUser(response);
+      const response = await this.projectRepository.find();
+      return await this.formatDataProjects(response);
     }
     const response = await this.projectUserRepository.find({
       where: { userId: userId },
     });
-    return await this.formatDataUser(response);
+    const data = this.formatDataProjectUser(response);
+    return data;
   }
 
-  async formatDataUser(data: ProjectUser[]) {
+  async formatDataProjectUser(data: ProjectUser[]) {
     const response = [];
     for (const projectUser of data) {
       const project = await this.projectRepository.findOne({
         where: { id: projectUser.projectId },
       });
+      const manager = await this.userRepository.findOne({
+        where: { id: project.referringEmployeeId },
+      });
+      delete manager.password;
+      response.push({
+        id: project.id,
+        name: project.name,
+        referringEmployeeId: project.referringEmployeeId,
+        referringEmployee: manager,
+      });
+    }
+    return response;
+  }
+
+  async formatDataProjects(data: Project[]) {
+    const response = [];
+    for (const project of data) {
       const manager = await this.userRepository.findOne({
         where: { id: project.referringEmployeeId },
       });

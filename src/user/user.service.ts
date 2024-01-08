@@ -8,20 +8,24 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { JwtService } from '@nestjs/jwt';
-import { Repository } from 'typeorm';
+import { Between, Repository } from 'typeorm';
 import * as bcrypt from 'bcrypt';
 
 // DOTs
 import { createUserDTO } from './dto/createUserDTO';
 
 // Entities
-import { Users } from './entities/user.entity';
+import { User } from './entities/user.entity';
+import * as dayjs from 'dayjs';
+import { Event } from '../Event/entities/event.entity';
 
 @Injectable()
 export class UserService {
   constructor(
-    @InjectRepository(Users) private readonly userRepository: Repository<Users>,
+    @InjectRepository(User) private readonly userRepository: Repository<User>,
     private jwtService: JwtService,
+    @InjectRepository(Event)
+    private readonly EventRepository: Repository<Event>,
   ) {}
 
   async create(createUserDto: createUserDTO) {
@@ -111,5 +115,34 @@ export class UserService {
       id: String(response.id),
       role: response.role,
     };
+  }
+
+  async getVouchers(userId: string, month: number) {
+    let workingDays = 0;
+    const dayjsfirstDayOfMonth = dayjs()
+      .month(month - 1)
+      .startOf('month');
+    const dayJslastDayOfMonth = dayjs()
+      .month(month - 1)
+      .endOf('month');
+    const firstDayOfMonth = dayjsfirstDayOfMonth;
+    const lastDayOfMonth = dayJslastDayOfMonth;
+    const absentDays = await this.EventRepository.find({
+      where: {
+        userId: userId,
+        date: Between(firstDayOfMonth.toDate(), lastDayOfMonth.toDate()),
+        eventStatus: 'Accepted',
+      },
+    });
+    for (
+      let day = firstDayOfMonth;
+      day.isBefore(lastDayOfMonth) || day.isSame(lastDayOfMonth);
+      day = day.add(1, 'day')
+    ) {
+      if (day.day() >= 1 && day.day() <= 5) {
+        workingDays++;
+      }
+    }
+    return { ticketRestaurant: (workingDays - absentDays.length ?? 0) * 8 };
   }
 }

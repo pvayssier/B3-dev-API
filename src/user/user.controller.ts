@@ -45,8 +45,7 @@ export class UserController {
   @ApiBearerAuth()
   @Get()
   async findAll() {
-    const response = await this.userService.findAll();
-    return response;
+    return await this.userService.findAll();
   }
 
   @UseGuards(AuthGuard)
@@ -54,5 +53,12 @@ export class UserController {
   @Get(':id')
   async findOne(@Param('id') id: string) {
     return await this.userService.findOne(id);
+  }
+
+  @UseGuards(AuthGuard)
+  @ApiBearerAuth()
+  @Get(':id/meal-vouchers/:month')
+  async getVouchers(@Param('id') id: string, @Param('month') month: number) {
+    return await this.userService.getVouchers(id, month);
   }
 }
